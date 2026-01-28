@@ -449,20 +449,35 @@ async function processVideoGeneration(photos, prompt, config, taskId) {
 }
 
 /**
- * 健康检查
+ * 健康检查 - 根路径
  */
-app.get('/api/health', (req, res) => {
-    res.json({ 
+app.get('/health', (req, res) => {
+    res.status(200).json({ 
         status: 'ok',
         service: SELECTED_SERVICE,
-        configured: !!VIDEO_API_CONFIG[SELECTED_SERVICE].token
+        configured: !!VIDEO_API_CONFIG[SELECTED_SERVICE].token,
+        timestamp: new Date().toISOString()
+    });
+});
+
+/**
+ * 健康检查 - API路径
+ */
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ 
+        status: 'ok',
+        service: SELECTED_SERVICE,
+        configured: !!VIDEO_API_CONFIG[SELECTED_SERVICE].token,
+        timestamp: new Date().toISOString()
     });
 });
 
 // 启动服务器
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`🚀 服务器运行在 http://localhost:${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0';
+
+app.listen(PORT, HOST, () => {
+    console.log(`🚀 服务器运行在 http://${HOST}:${PORT}`);
     console.log(`📹 视频生成服务: ${SELECTED_SERVICE}`);
     console.log(`🔑 API配置状态: ${VIDEO_API_CONFIG[SELECTED_SERVICE].token ? '✅ 已配置' : '❌ 未配置'}`);
 });

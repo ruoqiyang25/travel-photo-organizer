@@ -1,0 +1,21 @@
+{
+  "envId": "travel-1gqnz3xtb2119604",
+  "version": "2.0",
+  "framework": {
+    "name": "travel-photo-organizer",
+    "plugins": {
+      "node": {
+        "use": "@cloudbase/framework-plugin-node",
+        "inputs": {
+          "entry": "server.js",
+          "path": "/",
+          "name": "travel-app",
+          "port": 3000,
+          "buildCommand": "npm install",
+          "installCommand": "npm install",
+          "runtime": "Nodejs18"
+        }
+      }
+    }
+  }
+}
