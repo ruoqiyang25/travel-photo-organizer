@@ -70,8 +70,8 @@ function initEventListeners() {
     btnKeep.addEventListener('click', () => swipeCard('right'));
     btnUndo.addEventListener('click', undoLastAction);
     
-    // 视频生成按钮
-    document.getElementById('btn-generate-video').addEventListener('click', generateVideo);
+    // 故事簿生成按钮
+    document.getElementById('btn-generate-storybook').addEventListener('click', generateStorybook);
     document.getElementById('btn-restart').addEventListener('click', restart);
 }
 
@@ -112,7 +112,6 @@ function showSwipeSection() {
 function renderCards() {
     cardStack.innerHTML = '';
     
-    // 渲染最多3张卡片（当前 + 后面2张）
     const cardsToShow = 3;
     for (let i = 0; i < cardsToShow; i++) {
         const photoIndex = state.currentIndex + i;
@@ -135,7 +134,6 @@ function createCard(photo, stackIndex) {
     card.appendChild(img);
     cardStack.appendChild(card);
     
-    // 只为最上面的卡片添加交互
     if (stackIndex === 0) {
         initCardSwipe(card);
     }
@@ -148,7 +146,6 @@ function initCardSwipe(card) {
     let isDragging = false;
     
     const onStart = (e) => {
-        // 确保只响应最上层的卡片
         if (card !== cardStack.firstElementChild) return;
         
         isDragging = true;
@@ -169,7 +166,6 @@ function initCardSwipe(card) {
         const rotation = currentX * 0.1;
         card.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${rotation}deg)`;
         
-        // 更新提示标签
         if (Math.abs(currentX) > 50) {
             if (currentX > 0) {
                 hintKeep.classList.add('active');
@@ -199,7 +195,6 @@ function initCardSwipe(card) {
         const threshold = 100;
         
         if (Math.abs(currentX) > threshold) {
-            // 滑动距离足够，执行操作
             if (currentX > 0) {
                 animateCardOut(card, 'right');
                 savePhoto('keep');
@@ -208,7 +203,6 @@ function initCardSwipe(card) {
                 savePhoto('delete');
             }
         } else {
-            // 滑动距离不够，回弹
             card.style.transition = 'transform 0.3s ease';
             card.style.transform = '';
             card.classList.remove('swiping-left', 'swiping-right');
@@ -218,13 +212,11 @@ function initCardSwipe(card) {
         currentY = 0;
     };
     
-    // 鼠标事件
     card.addEventListener('mousedown', onStart);
     card.addEventListener('mousemove', onMove);
     card.addEventListener('mouseup', onEnd);
     card.addEventListener('mouseleave', onEnd);
     
-    // 触摸事件
     card.addEventListener('touchstart', onStart, { passive: false });
     card.addEventListener('touchmove', onMove, { passive: true });
     card.addEventListener('touchend', onEnd);
@@ -267,7 +259,6 @@ function swipeCard(direction) {
 function savePhoto(action) {
     const photo = state.photos[state.currentIndex];
     
-    // 记录历史
     state.history.push({
         photo: photo,
         action: action,
@@ -288,16 +279,13 @@ function nextCard() {
     state.currentIndex++;
     
     if (state.currentIndex >= state.photos.length) {
-        // 所有照片处理完成
         showGenerateSection();
     } else {
-        // 为新的顶部卡片添加滑动功能
         const newTopCard = cardStack.firstElementChild;
         if (newTopCard) {
             initCardSwipe(newTopCard);
         }
         
-        // 渲染新卡片
         const cardsCount = cardStack.children.length;
         const nextIndex = state.currentIndex + cardsCount;
         
@@ -313,14 +301,12 @@ function undoLastAction() {
     
     const lastAction = state.history.pop();
     
-    // 从保存的列表中移除
     if (lastAction.action === 'keep') {
         state.keptPhotos = state.keptPhotos.filter(p => p.id !== lastAction.photo.id);
     } else {
         state.deletedPhotos = state.deletedPhotos.filter(p => p.id !== lastAction.photo.id);
     }
     
-    // 回退索引
     state.currentIndex = lastAction.index;
     
     updateStats();
@@ -334,98 +320,289 @@ function updateStats() {
     remainingCount.textContent = state.photos.length - state.currentIndex;
 }
 
-// 显示视频生成区域
+// 显示生成区域
 function showGenerateSection() {
     uploadSection.style.display = 'none';
     swipeSection.style.display = 'none';
     generateSection.style.display = 'block';
     
     document.getElementById('final-kept-count').textContent = state.keptPhotos.length;
-    
-    // 显示保留的照片
-    const grid = document.getElementById('kept-photos-grid');
-    grid.innerHTML = '';
-    
-    state.keptPhotos.forEach(photo => {
-        const img = document.createElement('img');
-        img.src = photo.url;
-        img.alt = '保留的照片';
-        grid.appendChild(img);
-    });
-    
-    // 滚动到顶部
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// 生成视频
-async function generateVideo() {
+// 生成旅行故事簿
+async function generateStorybook() {
     const progressSection = document.getElementById('generation-progress');
-    const videoPreview = document.getElementById('video-preview');
+    const storybookSection = document.getElementById('storybook-section');
     const progressFill = document.getElementById('progress-fill');
     const progressText = document.getElementById('progress-text');
     
+    // 显示进度
     progressSection.style.display = 'block';
-    videoPreview.style.display = 'none';
-    
-    // 获取配置
-    const title = document.getElementById('video-title').value || '我的旅行日记';
-    const style = document.getElementById('video-style').value;
-    const music = document.getElementById('background-music').value;
-    const addVoiceover = document.getElementById('add-voiceover').checked;
-    const addCaptions = document.getElementById('add-captions').checked;
-    
-    const config = {
-        title,
-        style,
-        music,
-        addVoiceover,
-        addCaptions
-    };
+    storybookSection.style.display = 'none';
+    progressFill.style.width = '0%';
+    progressText.textContent = '正在准备照片...';
+    progressText.style.color = '#718096';
     
     try {
-        // 准备照片数据（转换为base64）
-        progressText.textContent = '正在准备照片数据...';
+        // 准备照片数据
         const photosData = await preparePhotosForAPI(state.keptPhotos);
         
-        // 调用后端API
-        progressFill.style.width = '10%';
-        progressText.textContent = '正在连接AI视频生成服务...';
+        progressFill.style.width = '30%';
+        progressText.textContent = '🤖 AI正在分析您的旅行照片...';
         
-        const response = await fetch('http://localhost:3000/api/generate-video', {
+        // 调用API生成整体故事
+        const response = await fetch('http://localhost:3000/api/generate-travel-story', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 photos: photosData,
-                config: config
+                photoCount: photosData.length
             })
         });
         
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || '视频生成失败');
+            throw new Error('故事生成失败');
         }
         
         const result = await response.json();
         
-        // 轮询检查视频生成状态
-        await pollVideoStatus(result.taskId, progressFill, progressText);
+        progressFill.style.width = '100%';
+        progressText.textContent = '✅ 旅行故事生成完成！';
+        progressText.style.color = '#34c759';
         
-        // 显示视频预览
-        progressSection.style.display = 'none';
-        videoPreview.style.display = 'block';
-        displayGeneratedVideo(result.taskId);
+        // 显示故事簿
+        setTimeout(() => {
+            progressSection.style.display = 'none';
+            displayStorybook(result.story, photosData);
+        }, 1500);
         
     } catch (error) {
-        console.error('Video generation error:', error);
-        progressText.textContent = '视频生成失败: ' + error.message;
+        console.error('故事簿生成失败:', error);
+        progressText.textContent = '❌ 生成失败: ' + error.message;
         progressText.style.color = '#ff3b30';
         
-        // 如果后端服务未运行，显示友好提示
-        if (error.message.includes('fetch')) {
-            alert('⚠️ 无法连接到后端服务\n\n请确保：\n1. 已安装依赖：npm install\n2. 已配置API密钥：.env文件\n3. 已启动服务器：npm start\n\n或者查看README.md了解详细配置说明');
+        if (error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
+            alert('⚠️ 无法连接到后端服务\n\n请确保：\n1. 已启动服务器：node server.js\n2. 服务器运行在：http://localhost:3000\n3. OpenAI API密钥已配置');
+        } else {
+            alert('生成失败：' + error.message);
         }
+    }
+}
+
+// 显示故事簿
+function displayStorybook(story, photos) {
+    const storybookSection = document.getElementById('storybook-section');
+    const narrativeDiv = document.getElementById('story-narrative');
+    const galleryDiv = document.getElementById('story-gallery');
+    
+    // 显示故事文本
+    narrativeDiv.innerHTML = `
+        <div class="story-title">✨ 旅行故事</div>
+        <div class="story-content">${story}</div>
+    `;
+    
+    // 创建炫酷的幻灯片展示
+    galleryDiv.innerHTML = `
+        <div class="slideshow-container">
+            <div class="slideshow-wrapper" id="slideshow-wrapper">
+                ${photos.map((photo, index) => `
+                    <div class="slide ${index === 0 ? 'active' : ''}" data-index="${index}">
+                        <img src="${photo.data}" alt="旅行照片 ${index + 1}">
+                        <div class="slide-number">${index + 1} / ${photos.length}</div>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <!-- 导航按钮 -->
+            <button class="slide-nav slide-prev" onclick="changeSlide(-1)">
+                <span>‹</span>
+            </button>
+            <button class="slide-nav slide-next" onclick="changeSlide(1)">
+                <span>›</span>
+            </button>
+            
+            <!-- 指示器 -->
+            <div class="slide-indicators">
+                ${photos.map((_, index) => `
+                    <span class="indicator ${index === 0 ? 'active' : ''}" onclick="goToSlide(${index})"></span>
+                `).join('')}
+            </div>
+            
+            <!-- 自动播放控制 -->
+            <button class="slideshow-toggle" onclick="toggleSlideshow()">
+                <span id="slideshow-icon">⏸</span>
+            </button>
+        </div>
+        
+        <!-- 缩略图网格 -->
+        <div class="thumbnail-grid">
+            ${photos.map((photo, index) => `
+                <div class="thumbnail ${index === 0 ? 'active' : ''}" onclick="goToSlide(${index})">
+                    <img src="${photo.data}" alt="缩略图 ${index + 1}">
+                    <div class="thumbnail-number">${index + 1}</div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+    
+    // 初始化幻灯片
+    initSlideshow(photos.length);
+    
+    // 设置分享和保存按钮
+    document.getElementById('btn-download-story').onclick = () => downloadStory(story, photos);
+    document.getElementById('btn-share-story').onclick = () => shareStory(story);
+    
+    storybookSection.style.display = 'block';
+    storybookSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+// 幻灯片变量
+let currentSlideIndex = 0;
+let slideshowInterval = null;
+let isPlaying = true;
+
+// 初始化幻灯片
+function initSlideshow(totalSlides) {
+    currentSlideIndex = 0;
+    startSlideshow();
+}
+
+// 开始自动播放
+function startSlideshow() {
+    if (slideshowInterval) clearInterval(slideshowInterval);
+    slideshowInterval = setInterval(() => {
+        changeSlide(1);
+    }, 3000); // 每3秒切换
+    isPlaying = true;
+    const icon = document.getElementById('slideshow-icon');
+    if (icon) icon.textContent = '⏸';
+}
+
+// 停止自动播放
+function stopSlideshow() {
+    if (slideshowInterval) {
+        clearInterval(slideshowInterval);
+        slideshowInterval = null;
+    }
+    isPlaying = false;
+    const icon = document.getElementById('slideshow-icon');
+    if (icon) icon.textContent = '▶';
+}
+
+// 切换自动播放
+function toggleSlideshow() {
+    if (isPlaying) {
+        stopSlideshow();
+    } else {
+        startSlideshow();
+    }
+}
+
+// 切换幻灯片
+function changeSlide(direction) {
+    const slides = document.querySelectorAll('.slide');
+    const indicators = document.querySelectorAll('.indicator');
+    const thumbnails = document.querySelectorAll('.thumbnail');
+    
+    if (slides.length === 0) return;
+    
+    // 移除当前active
+    slides[currentSlideIndex].classList.remove('active');
+    indicators[currentSlideIndex].classList.remove('active');
+    thumbnails[currentSlideIndex].classList.remove('active');
+    
+    // 计算新索引
+    currentSlideIndex = (currentSlideIndex + direction + slides.length) % slides.length;
+    
+    // 添加新的active
+    slides[currentSlideIndex].classList.add('active');
+    indicators[currentSlideIndex].classList.add('active');
+    thumbnails[currentSlideIndex].classList.add('active');
+    
+    // 滚动缩略图到可见区域
+    thumbnails[currentSlideIndex].scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'nearest',
+        inline: 'center'
+    });
+}
+
+// 跳转到指定幻灯片
+function goToSlide(index) {
+    const slides = document.querySelectorAll('.slide');
+    if (slides.length === 0) return;
+    
+    const direction = index - currentSlideIndex;
+    changeSlide(direction);
+    
+    // 重置自动播放
+    if (isPlaying) {
+        startSlideshow();
+    }
+}
+
+// 下载故事簿
+function downloadStory(story, photos) {
+    // 创建HTML内容
+    const htmlContent = `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的旅行故事</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+        .story { background: white; padding: 40px; border-radius: 10px; margin-bottom: 30px; }
+        .story-title { font-size: 28px; font-weight: bold; margin-bottom: 20px; color: #667eea; }
+        .story-content { line-height: 1.8; font-size: 16px; color: #333; white-space: pre-wrap; }
+        .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .gallery img { width: 100%; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <div class="story">
+        <div class="story-title">✨ 我的旅行故事</div>
+        <div class="story-content">${story}</div>
+    </div>
+    <div class="gallery">
+        ${photos.map((p, i) => `<img src="${p.data}" alt="照片${i+1}">`).join('')}
+    </div>
+</body>
+</html>
+    `;
+    
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `travel-story-${Date.now()}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    alert('✅ 故事簿已保存！');
+}
+
+// 分享故事
+async function shareStory(story) {
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: '我的旅行故事',
+                text: story
+            });
+        } catch (err) {
+            console.log('分享取消');
+        }
+    } else {
+        navigator.clipboard.writeText(story).then(() => {
+            alert('✅ 故事已复制到剪贴板！');
+        }).catch(() => {
+            alert('❌ 复制失败');
+        });
     }
 }
 
@@ -436,7 +613,7 @@ async function preparePhotosForAPI(photos) {
             const reader = new FileReader();
             reader.onloadend = () => {
                 resolve({
-                    data: reader.result, // base64
+                    data: reader.result,
                     filename: photo.file.name
                 });
             };
@@ -447,184 +624,8 @@ async function preparePhotosForAPI(photos) {
     return await Promise.all(promises);
 }
 
-// 轮询视频生成状态
-async function pollVideoStatus(taskId, progressFill, progressText) {
-    const maxAttempts = 120; // 最多等待10分钟
-    let attempts = 0;
-    
-    while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 5000)); // 每5秒检查一次
-        
-        try {
-            const response = await fetch(`http://localhost:3000/api/video-status/${taskId}`);
-            const status = await response.json();
-            
-            // 更新进度
-            progressFill.style.width = status.progress + '%';
-            progressText.textContent = status.message || '正在生成视频...';
-            
-            if (status.status === 'completed') {
-                progressFill.style.width = '100%';
-                progressText.textContent = '视频生成完成！';
-                return status;
-            }
-            
-            if (status.status === 'failed') {
-                throw new Error(status.message || '视频生成失败');
-            }
-            
-        } catch (error) {
-            console.error('Poll status error:', error);
-        }
-        
-        attempts++;
-    }
-    
-    throw new Error('视频生成超时');
-}
-
-// 显示生成的视频
-function displayGeneratedVideo(taskId) {
-    const video = document.getElementById('generated-video');
-    video.src = `http://localhost:3000/api/video/download/${taskId}`;
-    video.load();
-    
-    // 下载按钮
-    document.getElementById('btn-download').onclick = () => {
-        const a = document.createElement('a');
-        a.href = video.src;
-        a.download = `travel-video-${taskId}.mp4`;
-        a.click();
-    };
-    
-    // 分享按钮
-    document.getElementById('btn-share').onclick = async () => {
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: '我的旅行视频',
-                    text: '看看我的旅行日记视频！',
-                    url: window.location.href
-                });
-            } catch (err) {
-                console.log('分享取消或失败');
-            }
-        } else {
-            alert('你的浏览器不支持分享功能');
-        }
-    };
-}
-
-// 创建视频预览
-function createVideoPreview() {
-    const video = document.getElementById('generated-video');
-    
-    // 使用 Canvas 创建简单的视频预览
-    const canvas = document.createElement('canvas');
-    canvas.width = 1080;
-    canvas.height = 1920;
-    const ctx = canvas.getContext('2d');
-    
-    let currentPhotoIndex = 0;
-    const fps = 30;
-    const photoDuration = 3; // 每张照片显示3秒
-    const framesPerPhoto = fps * photoDuration;
-    let frameCount = 0;
-    
-    const images = [];
-    const loadPromises = state.keptPhotos.map(photo => {
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-                images.push(img);
-                resolve();
-            };
-            img.src = photo.url;
-        });
-    });
-    
-    Promise.all(loadPromises).then(() => {
-        const stream = canvas.captureStream(fps);
-        video.srcObject = stream;
-        video.play();
-        
-        function drawFrame() {
-            if (currentPhotoIndex >= images.length) {
-                // 视频结束
-                stream.getTracks().forEach(track => track.stop());
-                // 转换为可下载的视频
-                convertToDownloadableVideo(canvas, fps, framesPerPhoto * images.length);
-                return;
-            }
-            
-            const img = images[currentPhotoIndex];
-            
-            // 填充背景
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // 绘制照片（居中缩放）
-            const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
-            const x = (canvas.width - img.width * scale) / 2;
-            const y = (canvas.height - img.height * scale) / 2;
-            ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-            
-            // 添加简单的渐变效果
-            const fadeFrames = fps / 2; // 0.5秒渐变
-            if (frameCount < fadeFrames) {
-                ctx.fillStyle = `rgba(0, 0, 0, ${1 - frameCount / fadeFrames})`;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
-            
-            frameCount++;
-            if (frameCount >= framesPerPhoto) {
-                frameCount = 0;
-                currentPhotoIndex++;
-            }
-            
-            requestAnimationFrame(drawFrame);
-        }
-        
-        drawFrame();
-    });
-}
-
-// 转换为可下载的视频
-function convertToDownloadableVideo(canvas, fps, totalFrames) {
-    // 这里应该使用 MediaRecorder 录制视频
-    // 为了简化，我们直接使用第一张照片作为封面
-    const video = document.getElementById('generated-video');
-    
-    // 创建一个简单的视频预览
-    if (state.keptPhotos.length > 0) {
-        video.poster = state.keptPhotos[0].url;
-    }
-    
-    // 下载按钮功能
-    document.getElementById('btn-download').onclick = () => {
-        alert('在实际应用中，这里会下载生成的视频文件。\n视频包含 ' + state.keptPhotos.length + ' 张照片。');
-    };
-    
-    // 分享按钮功能
-    document.getElementById('btn-share').onclick = async () => {
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: '我的旅行视频',
-                    text: '看看我的旅行日记视频！',
-                });
-            } catch (err) {
-                console.log('分享取消或失败');
-            }
-        } else {
-            alert('你的浏览器不支持分享功能');
-        }
-    };
-}
-
 // 重新开始
 function restart() {
-    // 清理旧的对象URL
     state.photos.forEach(photo => {
         URL.revokeObjectURL(photo.url);
     });

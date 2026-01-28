@@ -13,8 +13,12 @@ RUN npm install --production
 # 复制所有项目文件
 COPY . .
 
+# 设置环境变量 - 容器内使用80端口
+ENV PORT=80
+ENV HOST=0.0.0.0
+
 # 暴露端口
-EXPOSE 3000
+EXPOSE 80
 
 # 启动命令
 CMD ["npm", "start"]

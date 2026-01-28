@@ -82,60 +82,10 @@
                 <p>你保留了 <strong id="final-kept-count">0</strong> 张照片</p>
             </div>
 
-            <!-- 保留的照片预览 -->
-            <div class="kept-photos-section">
-                <h3>保留的照片</h3>
-                <div id="kept-photos-grid" class="photos-grid"></div>
-            </div>
-
-            <!-- 视频配置 -->
-            <div class="video-config">
-                <h3>视频设置</h3>
-                
-                <div class="config-item">
-                    <label>视频标题</label>
-                    <input type="text" id="video-title" placeholder="我的旅行日记" class="input-field">
-                </div>
-
-                <div class="config-item">
-                    <label>视频风格</label>
-                    <select id="video-style" class="input-field">
-                        <option value="cinematic">电影感</option>
-                        <option value="vlog">Vlog 风格</option>
-                        <option value="memories">回忆录</option>
-                        <option value="dynamic">动感快节奏</option>
-                    </select>
-                </div>
-
-                <div class="config-item">
-                    <label>背景音乐</label>
-                    <select id="background-music" class="input-field">
-                        <option value="peaceful">轻松愉悦</option>
-                        <option value="adventure">冒险探索</option>
-                        <option value="romantic">浪漫温馨</option>
-                        <option value="energetic">活力动感</option>
-                    </select>
-                </div>
-
-                <div class="config-item">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="add-voiceover" checked>
-                        <span>添加 AI 配音解说</span>
-                    </label>
-                </div>
-
-                <div class="config-item">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="add-captions" checked>
-                        <span>添加文字字幕</span>
-                    </label>
-                </div>
-            </div>
-
             <!-- 生成按钮 -->
             <div class="generate-buttons">
-                <button class="btn-generate" id="btn-generate-video">
-                    🎬 生成旅行视频
+                <button class="btn-generate" id="btn-generate-storybook">
+                    📖 生成旅行故事簿
                 </button>
                 <button class="btn-restart" id="btn-restart">
                     🔄 重新开始
@@ -144,22 +94,31 @@
 
             <!-- 生成进度 -->
             <div id="generation-progress" class="generation-progress" style="display: none;">
-                <h3>正在生成视频...</h3>
+                <h3>正在生成旅行故事...</h3>
                 <div class="progress-bar">
                     <div id="progress-fill" class="progress-fill"></div>
                 </div>
                 <p id="progress-text" class="progress-text">准备中...</p>
             </div>
 
-            <!-- 视频预览 -->
-            <div id="video-preview" class="video-preview" style="display: none;">
-                <h3>视频预览</h3>
-                <video id="generated-video" controls playsinline class="preview-video"></video>
-                <div class="preview-buttons">
-                    <button class="btn-download" id="btn-download">
-                        💾 下载视频
+            <!-- 旅行故事簿 -->
+            <div id="storybook-section" class="storybook-section" style="display: none;">
+                <div class="storybook-header">
+                    <h3>📖 我的旅行故事</h3>
+                </div>
+                
+                <!-- AI生成的故事文本 -->
+                <div class="story-narrative" id="story-narrative"></div>
+                
+                <!-- 照片画廊 -->
+                <div class="story-gallery" id="story-gallery"></div>
+                
+                <!-- 分享按钮 -->
+                <div class="storybook-actions">
+                    <button class="btn-download" id="btn-download-story">
+                        💾 保存故事簿
                     </button>
-                    <button class="btn-share" id="btn-share">
+                    <button class="btn-share" id="btn-share-story">
                         📤 分享
                     </button>
                 </div>

@@ -619,6 +619,72 @@ async function processVideoGeneration(photos, prompt, config, taskId) {
 }
 
 /**
+ * 测试OpenAI API连接
+ */
+app.get('/test-openai', async (req, res) => {
+    try {
+        const OPENAI_KEY = process.env.OPENAI_API_KEY;
+        const OPENAI_BASE = process.env.OPENAI_API_BASE || 'https://api.openai.com';
+        
+        if (!OPENAI_KEY) {
+            return res.json({ 
+                success: false, 
+                error: 'OpenAI API密钥未配置' 
+            });
+        }
+
+        console.log('🧪 测试OpenAI API连接...');
+        console.log('📡 API Base:', OPENAI_BASE);
+        console.log('🔑 API Key:', OPENAI_KEY.substring(0, 15) + '...');
+        
+        // 发送简单的文本请求
+        const apiUrl = `${OPENAI_BASE}/v1/chat/completions`;
+        console.log('🌐 请求地址:', apiUrl);
+        
+        const response = await axios.post(
+            apiUrl,
+            {
+                model: 'gpt-3.5-turbo',
+                messages: [{
+                    role: 'user',
+                    content: '你好，请回复"测试成功"'
+                }],
+                max_tokens: 50
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${OPENAI_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 30000
+            }
+        );
+
+        const reply = response.data.choices[0].message.content;
+        console.log('✅ OpenAI API测试成功');
+        console.log('📝 回复:', reply);
+
+        res.json({
+            success: true,
+            message: 'OpenAI API连接正常',
+            reply: reply,
+            model: response.data.model,
+            usage: response.data.usage,
+            apiBase: OPENAI_BASE
+        });
+
+    } catch (error) {
+        console.error('❌ OpenAI API测试失败:', error.message);
+        res.json({
+            success: false,
+            error: error.message,
+            code: error.code,
+            details: error.response?.data
+        });
+    }
+});
+
+/**
  * 健康检查 - 根路径
  */
 app.get('/health', (req, res) => {
@@ -642,6 +708,276 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+/**
+ * AI图片描述 - 使用GPT-4 Vision分析单张图片
+ */
+app.post('/api/describe-image', async (req, res) => {
+    try {
+        const { image, detailLevel } = req.body;
+
+        if (!image) {
+            return res.status(400).json({ error: '没有提供图片' });
+        }
+
+        const OPENAI_KEY = process.env.OPENAI_API_KEY;
+        const OPENAI_BASE = process.env.OPENAI_API_BASE || 'https://api.openai.com';
+        
+        if (!OPENAI_KEY) {
+            return res.status(500).json({ error: 'OpenAI API密钥未配置' });
+        }
+
+        console.log('🖼️  开始AI图片描述生成...');
+        console.log('📡 使用模型: gpt-4o');
+
+        // 使用GPT-4o（支持Vision）分析图片
+        const apiUrl = `${OPENAI_BASE}/v1/chat/completions`;
+        
+        const analysisResponse = await axios.post(
+            apiUrl,
+            {
+                model: 'gpt-4o',  // 或 'gpt-4-vision-preview'
+                messages: [{
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'text',
+                            text: detailLevel === 'detailed' 
+                                ? '请详细描述这张图片的内容，包括：1) 主要场景和环境 2) 人物或物体的细节 3) 色彩和光线 4) 整体氛围和感受。用200-300字的中文描述。'
+                                : '请简洁地描述这张图片的主要内容，用50-100字的中文总结。'
+                        },
+                        {
+                            type: 'image_url',
+                            image_url: {
+                                url: image,
+                                detail: detailLevel === 'detailed' ? 'high' : 'low'
+                            }
+                        }
+                    ]
+                }],
+                max_tokens: detailLevel === 'detailed' ? 500 : 150
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${OPENAI_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 30000
+            }
+        );
+
+        const description = analysisResponse.data.choices[0].message.content;
+        console.log('✅ 图片描述生成完成');
+        console.log(`💡 描述: ${description.substring(0, 100)}...`);
+
+        res.json({
+            success: true,
+            description: description,
+            model: analysisResponse.data.model,
+            usage: analysisResponse.data.usage,
+            message: '图片描述生成完成！'
+        });
+
+    } catch (error) {
+        console.error('❌ 图片描述生成失败:', error.response?.data || error.message);
+        res.status(500).json({ 
+            error: '图片描述生成失败', 
+            message: error.message,
+            details: error.response?.data
+        });
+    }
+});
+
+/**
+ * 生成旅行描述 - 基于照片数量和可能的内容生成旅行描述
+ */
+app.post('/api/generate-travel-story', async (req, res) => {
+    try {
+        const { photos, photoCount } = req.body;
+
+        if (!photos || photos.length === 0) {
+            return res.status(400).json({ error: '没有提供照片' });
+        }
+
+        const OPENAI_KEY = process.env.OPENAI_API_KEY;
+        const OPENAI_BASE = process.env.OPENAI_API_BASE || 'https://api.openai.com';
+        
+        if (!OPENAI_KEY) {
+            return res.status(500).json({ error: 'OpenAI API密钥未配置' });
+        }
+
+        console.log('📖 开始生成旅行描述...');
+        console.log(`📸 照片数量: ${photos.length} 张`);
+
+        const apiUrl = `${OPENAI_BASE}/v1/chat/completions`;
+        
+        // 先分析第一张照片，获取旅行场景
+        let sceneAnalysis = '';
+        try {
+            const analysisResponse = await axios.post(
+                apiUrl,
+                {
+                    model: 'gpt-4o',
+                    messages: [{
+                        role: 'user',
+                        content: [
+                            {
+                                type: 'text',
+                                text: '请简要描述这张照片中的场景（地点类型、环境、氛围），用1-2句话概括。'
+                            },
+                            {
+                                type: 'image_url',
+                                image_url: {
+                                    url: photos[0].data,
+                                    detail: 'low'
+                                }
+                            }
+                        ]
+                    }],
+                    max_tokens: 100
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${OPENAI_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 30000
+                }
+            );
+            sceneAnalysis = analysisResponse.data.choices[0].message.content;
+            console.log('✅ 场景分析完成:', sceneAnalysis);
+        } catch (error) {
+            console.log('⚠️  场景分析失败，将使用通用描述');
+            sceneAnalysis = '这次旅行充满了美好的回忆';
+        }
+
+        // 基于场景分析生成完整的旅行描述
+        const prompt = `你是一位优秀的旅行作家。用户刚完成了一次旅行，精心挑选了${photos.length}张照片。
+
+场景信息：${sceneAnalysis}
+
+请基于以上信息，创作一段温馨动人的旅行描述，要求：
+
+1. 用第一人称"我"来讲述这次旅程
+2. 描述要生动、有画面感，让读者身临其境
+3. 包含旅行的感受、见闻和难忘瞬间
+4. 体现这${photos.length}张照片背后的旅行故事
+5. 文笔优美，情感真挚
+6. 字数控制在300-500字之间
+
+请创作一段完整的旅行描述：`;
+
+        const response = await axios.post(
+            apiUrl,
+            {
+                model: 'gpt-3.5-turbo',
+                messages: [{
+                    role: 'user',
+                    content: prompt
+                }],
+                max_tokens: 800,
+                temperature: 0.9
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${OPENAI_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 30000
+            }
+        );
+
+        const story = response.data.choices[0].message.content;
+        console.log('✅ 旅行描述生成完成');
+        console.log(`📝 描述预览: ${story.substring(0, 100)}...`);
+
+        res.json({
+            success: true,
+            story: story,
+            message: '旅行描述生成完成！'
+        });
+
+    } catch (error) {
+        console.error('旅行描述生成失败:', error.response?.data || error.message);
+        res.status(500).json({ 
+            error: '旅行描述生成失败', 
+            message: error.message,
+            details: error.response?.data
+        });
+    }
+});
+
+/**
+ * AI图片描述 - 使用GPT生成旅行描述
+ */
+app.post('/api/generate-ai-image', async (req, res) => {
+    try {
+        const { photoCount } = req.body;
+
+        if (!photoCount || photoCount === 0) {
+            return res.status(400).json({ error: '没有提供照片数量' });
+        }
+
+        const OPENAI_KEY = process.env.OPENAI_API_KEY;
+        const OPENAI_BASE = process.env.OPENAI_API_BASE || 'https://api.openai.com';
+        
+        if (!OPENAI_KEY) {
+            return res.status(500).json({ error: 'OpenAI API密钥未配置' });
+        }
+
+        console.log('🎨 开始AI照片描述生成...');
+        console.log(`📸 照片数量: ${photoCount} 张`);
+
+        // 使用GPT-3.5生成旅行描述
+        const prompt = `你是一位专业的旅行作家。我刚结束了一次旅行，保留了 ${photoCount} 张精选照片。请根据这个数量，创作一段优美生动的旅行描述，包括：
+
+1) 旅行的主题和可能的场景特点（如海滨、山区、城市、乡村等）
+2) 整体的氛围和感受（如轻松愉快、充满冒险、文艺浪漫等）
+3) 这次旅行的独特魅力和值得回忆的瞬间
+
+请用200-300字的中文描述，让读者能够感受到这次旅行的美好。描述要生动、有画面感。`;
+
+        const apiUrl = `${OPENAI_BASE}/v1/chat/completions`;
+        
+        const analysisResponse = await axios.post(
+            apiUrl,
+            {
+                model: 'gpt-3.5-turbo',
+                messages: [{
+                    role: 'user',
+                    content: prompt
+                }],
+                max_tokens: 500,
+                temperature: 0.8
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${OPENAI_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 30000
+            }
+        );
+
+        const description = analysisResponse.data.choices[0].message.content;
+        console.log('✅ 照片描述生成完成');
+        console.log(`💡 生成的描述: ${description.substring(0, 100)}...`);
+
+        res.json({
+            success: true,
+            description: description,
+            message: 'AI照片描述生成完成！'
+        });
+
+    } catch (error) {
+        console.error('AI照片描述生成失败:', error.response?.data || error.message);
+        res.status(500).json({ 
+            error: 'AI照片描述生成失败', 
+            message: error.message,
+            details: error.response?.data
+        });
+    }
+});
+
 // 启动服务器
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -650,4 +986,5 @@ app.listen(PORT, HOST, () => {
     console.log(`🚀 服务器运行在 http://${HOST}:${PORT}`);
     console.log(`📹 视频生成服务: ${SELECTED_SERVICE}`);
     console.log(`🔑 API配置状态: ${VIDEO_API_CONFIG[SELECTED_SERVICE].token ? '✅ 已配置' : '❌ 未配置'}`);
+    console.log(`🎨 AI图片生成: ${process.env.OPENAI_API_KEY ? '✅ 已配置' : '❌ 未配置'}`);
 });

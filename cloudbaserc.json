@@ -10,7 +10,7 @@
           "entry": "server.js",
           "path": "/",
           "name": "travel-app",
-          "port": 3000,
+          "port": 80,
           "buildCommand": "npm install",
           "installCommand": "npm install",
           "runtime": "Nodejs18"
