@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: travel-photo-organizer
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: VIDEO_SERVICE
+        value: sora
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PORT
+        value: 3000

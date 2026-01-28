@@ -1,0 +1,32 @@
+# 环境变量（包含API密钥，不能提交）
+.env
+
+# 依赖
+node_modules/
+package-lock.json
+
+# 日志
+*.log
+npm-debug.log*
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 临时文件
+*.tmp
+.cache/
+
+# 上传的图片（如果有）
+uploads/
+temp/
+
+# 生成的视频（如果有）
+videos/
+output/

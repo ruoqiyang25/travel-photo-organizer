@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>旅行照片整理器</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 头部统计 -->
+        <header class="header">
+            <h1>📸 旅行相册</h1>
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-label">保留</span>
+                    <span class="stat-value" id="kept-count">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">删除</span>
+                    <span class="stat-value" id="deleted-count">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">剩余</span>
+                    <span class="stat-value" id="remaining-count">0</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 上传区域 -->
+        <div id="upload-section" class="upload-section">
+            <div class="upload-box">
+                <div class="upload-icon">📷</div>
+                <h2>开始整理你的旅行照片</h2>
+                <p class="upload-desc">像刷抖音一样轻松整理照片</p>
+                <input type="file" id="file-input" multiple accept="image/*" style="display: none;">
+                <button class="btn-upload" onclick="document.getElementById('file-input').click()">
+                    选择照片
+                </button>
+                <p class="upload-hint">向右滑保留 👉 · 向左滑删除 👈</p>
+            </div>
+        </div>
+
+        <!-- 滑动卡片区域 -->
+        <div id="swipe-section" class="swipe-section" style="display: none;">
+            <!-- 提示标签 -->
+            <div class="hint-labels">
+                <div class="hint-label hint-delete">
+                    <span class="hint-icon">❌</span>
+                    <span>删除</span>
+                </div>
+                <div class="hint-label hint-keep">
+                    <span class="hint-icon">✅</span>
+                    <span>保留</span>
+                </div>
+            </div>
+
+            <!-- 卡片堆栈 -->
+            <div id="card-stack" class="card-stack"></div>
+
+            <!-- 操作按钮 -->
+            <div class="action-buttons">
+                <button class="btn-action btn-delete" id="btn-delete" title="删除">
+                    <span class="btn-icon">❌</span>
+                </button>
+                <button class="btn-action btn-undo" id="btn-undo" title="撤销">
+                    <span class="btn-icon">↩️</span>
+                </button>
+                <button class="btn-action btn-keep" id="btn-keep" title="保留">
+                    <span class="btn-icon">✅</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 视频生成区域 -->
+        <div id="generate-section" class="generate-section" style="display: none;">
+            <div class="completion-card">
+                <div class="completion-icon">🎉</div>
+                <h2>整理完成！</h2>
+                <p>你保留了 <strong id="final-kept-count">0</strong> 张照片</p>
+            </div>
+
+            <!-- 保留的照片预览 -->
+            <div class="kept-photos-section">
+                <h3>保留的照片</h3>
+                <div id="kept-photos-grid" class="photos-grid"></div>
+            </div>
+
+            <!-- 视频配置 -->
+            <div class="video-config">
+                <h3>视频设置</h3>
+                
+                <div class="config-item">
+                    <label>视频标题</label>
+                    <input type="text" id="video-title" placeholder="我的旅行日记" class="input-field">
+                </div>
+
+                <div class="config-item">
+                    <label>视频风格</label>
+                    <select id="video-style" class="input-field">
+                        <option value="cinematic">电影感</option>
+                        <option value="vlog">Vlog 风格</option>
+                        <option value="memories">回忆录</option>
+                        <option value="dynamic">动感快节奏</option>
+                    </select>
+                </div>
+
+                <div class="config-item">
+                    <label>背景音乐</label>
+                    <select id="background-music" class="input-field">
+                        <option value="peaceful">轻松愉悦</option>
+                        <option value="adventure">冒险探索</option>
+                        <option value="romantic">浪漫温馨</option>
+                        <option value="energetic">活力动感</option>
+                    </select>
+                </div>
+
+                <div class="config-item">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="add-voiceover" checked>
+                        <span>添加 AI 配音解说</span>
+                    </label>
+                </div>
+
+                <div class="config-item">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="add-captions" checked>
+                        <span>添加文字字幕</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 生成按钮 -->
+            <div class="generate-buttons">
+                <button class="btn-generate" id="btn-generate-video">
+                    🎬 生成旅行视频
+                </button>
+                <button class="btn-restart" id="btn-restart">
+                    🔄 重新开始
+                </button>
+            </div>
+
+            <!-- 生成进度 -->
+            <div id="generation-progress" class="generation-progress" style="display: none;">
+                <h3>正在生成视频...</h3>
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+                <p id="progress-text" class="progress-text">准备中...</p>
+            </div>
+
+            <!-- 视频预览 -->
+            <div id="video-preview" class="video-preview" style="display: none;">
+                <h3>视频预览</h3>
+                <video id="generated-video" controls playsinline class="preview-video"></video>
+                <div class="preview-buttons">
+                    <button class="btn-download" id="btn-download">
+                        💾 下载视频
+                    </button>
+                    <button class="btn-share" id="btn-share">
+                        📤 分享
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
