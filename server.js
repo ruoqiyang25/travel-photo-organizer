@@ -22,7 +22,7 @@ const VIDEO_API_CONFIG = {
     },
     // Kling AI - 快手可灵（国内推荐）
     kling: {
-        endpoint: 'https://api.klingai.com/v1/videos/image2video',
+        endpoint: 'https://klingai.kuaishou.com/api/v1/videos/image2video',
         token: process.env.KLING_API_KEY,
         name: '快手可灵',
         features: ['高质量', '支持文字', '快速生成']
