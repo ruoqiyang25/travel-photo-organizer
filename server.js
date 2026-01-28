@@ -15,30 +15,43 @@ app.use(express.static('.'));
 
 // API配置 - 支持多个视频生成服务
 const VIDEO_API_CONFIG = {
-    // OpenAI Sora 2 (推荐)
+    // OpenAI Sora 2
     sora: {
         endpoint: 'https://api.openai.com/v1/videos',
         token: process.env.OPENAI_API_KEY
     },
-    // Kling AI (可选)
+    // Kling AI - 快手可灵（国内推荐）
     kling: {
-        endpoint: 'https://api.newapi.ai/api/ai-model/videos/kling/createklingimage2video',
-        token: process.env.KLING_API_KEY
+        endpoint: 'https://api.klingai.com/v1/videos/image2video',
+        token: process.env.KLING_API_KEY,
+        name: '快手可灵',
+        features: ['高质量', '支持文字', '快速生成']
     },
-    // Runway (可选)
+    // 即梦AI - 字节跳动（国内推荐）
+    jimeng: {
+        endpoint: 'https://open.volcengineapi.com/api/v1/video_generation',
+        token: process.env.JIMENG_API_KEY,
+        name: '即梦AI',
+        features: ['电影级画质', '智能字幕', '旅游场景优化']
+    },
+    // 通义千问视频生成
+    qwen: {
+        endpoint: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/generation',
+        token: process.env.QWEN_API_KEY,
+        name: '通义千问',
+        features: ['阿里云', '稳定可靠', '中文优化']
+    },
+    // Runway Gen-2
     runway: {
         endpoint: 'https://api.runwayml.com/v1/gen2',
-        token: process.env.RUNWAY_API_KEY
-    },
-    // 即梦AI (可选)
-    jimeng: {
-        endpoint: 'https://jimeng.api.volcengine.com/v1/video/generate',
-        token: process.env.JIMENG_API_KEY
+        token: process.env.RUNWAY_API_KEY,
+        name: 'Runway Gen-2',
+        features: ['专业级', '电影质感']
     }
 };
 
 // 选择使用的服务
-const SELECTED_SERVICE = process.env.VIDEO_SERVICE || 'sora';
+const SELECTED_SERVICE = process.env.VIDEO_SERVICE || 'kling';
 
 /**
  * 生成视频提示词
@@ -128,30 +141,119 @@ async function generateVideoWithSora(imageFile, prompt, config) {
 }
 
 /**
- * 调用Kling API生成视频
+ * 调用Kling API生成视频（快手可灵）
  */
-async function generateVideoWithKling(imageBase64, prompt, config) {
+async function generateVideoWithKling(imageBase64, prompt, config, caption) {
     try {
         const response = await axios.post(
             VIDEO_API_CONFIG.kling.endpoint,
             {
+                model_name: 'kling-v1',
                 image: imageBase64,
                 prompt: prompt,
+                negative_prompt: '模糊,低质量,变形',
+                cfg_scale: 0.5,
                 duration: 5, // 5秒视频
-                mode: 'pro',
-                aspect_ratio: '9:16', // 竖屏
-                n: 1
+                mode: 'pro', // std 或 pro
+                aspect_ratio: '16:9', // 适合旅游视频
+                // 添加文字叠加
+                text_overlay: config.addCaptions ? {
+                    text: caption,
+                    position: 'bottom',
+                    font_size: 24,
+                    font_color: '#FFFFFF',
+                    background: 'rgba(0,0,0,0.6)',
+                    animation: 'fade_in'
+                } : null
             },
             {
                 headers: {
                     'Authorization': `Bearer ${VIDEO_API_CONFIG.kling.token}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                timeout: 60000
             }
         );
         return response.data;
     } catch (error) {
         console.error('Kling API Error:', error.response?.data || error.message);
+        throw error;
+    }
+}
+
+/**
+ * 调用即梦AI生成视频（字节跳动）
+ */
+async function generateVideoWithJimeng(imageBase64, prompt, config, caption) {
+    try {
+        const response = await axios.post(
+            VIDEO_API_CONFIG.jimeng.endpoint,
+            {
+                req_key: `jimeng_${Date.now()}`,
+                prompt: prompt,
+                model_version: 'v2.5',
+                image: imageBase64,
+                video_duration: 5,
+                video_quality: 'high',
+                aspect_ratio: '16:9',
+                // 智能字幕
+                subtitle: config.addCaptions ? {
+                    enabled: true,
+                    text: caption,
+                    style: 'modern',
+                    position: 'bottom',
+                    font_family: 'PingFang SC',
+                    animation: 'smooth'
+                } : null
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${VIDEO_API_CONFIG.jimeng.token}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 60000
+            }
+        );
+        return response.data;
+    } catch (error) {
+        console.error('Jimeng API Error:', error.response?.data || error.message);
+        throw error;
+    }
+}
+
+/**
+ * 调用通义千问视频生成API
+ */
+async function generateVideoWithQwen(imageBase64, prompt, config, caption) {
+    try {
+        const response = await axios.post(
+            VIDEO_API_CONFIG.qwen.endpoint,
+            {
+                model: 'qwen-vl-video',
+                input: {
+                    image_url: imageBase64,
+                    prompt: prompt,
+                    text_overlay: config.addCaptions ? caption : null
+                },
+                parameters: {
+                    duration: 5,
+                    fps: 24,
+                    resolution: '1280x720',
+                    style: 'travel_vlog'
+                }
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${VIDEO_API_CONFIG.qwen.token}`,
+                    'Content-Type': 'application/json',
+                    'X-DashScope-Async': 'enable'
+                },
+                timeout: 60000
+            }
+        );
+        return response.data;
+    } catch (error) {
+        console.error('Qwen API Error:', error.response?.data || error.message);
         throw error;
     }
 }
@@ -254,6 +356,74 @@ function generateNarration(photos, style) {
 
     const narrations = narrativeStyles[style] || narrativeStyles.cinematic;
     return narrations[Math.floor(Math.random() * narrations.length)];
+}
+
+/**
+ * 为每张照片生成智能文字描述
+ */
+function generatePhotoCaption(photoIndex, totalPhotos, style, videoTitle) {
+    const captionTemplates = {
+        cinematic: [
+            `${videoTitle || '旅行回忆'} - 第${photoIndex + 1}章`,
+            `那些美好时光 · ${photoIndex + 1}/${totalPhotos}`,
+            `珍藏的瞬间 #${photoIndex + 1}`,
+            `旅途中的故事 (${photoIndex + 1}/${totalPhotos})`
+        ],
+        vlog: [
+            `Day ${photoIndex + 1} 📍`,
+            `打卡第${photoIndex + 1}站 ✨`,
+            `今天也是元气满满的一天 (${photoIndex + 1}/${totalPhotos})`,
+            `分享给你们 ${photoIndex + 1}/${totalPhotos} 💕`
+        ],
+        memories: [
+            `回忆 · ${photoIndex + 1}`,
+            `时光胶囊 ${photoIndex + 1}/${totalPhotos}`,
+            `定格这一刻 ⏰`,
+            `${videoTitle || '那些年'} · ${photoIndex + 1}`
+        ],
+        dynamic: [
+            `冒险第${photoIndex + 1}站 🚀`,
+            `探索继续 ${photoIndex + 1}/${totalPhotos}`,
+            `GO! ${photoIndex + 1}/${totalPhotos} 💪`,
+            `精彩继续 · ${photoIndex + 1}`
+        ]
+    };
+
+    const templates = captionTemplates[style] || captionTemplates.cinematic;
+    return templates[photoIndex % templates.length];
+}
+
+/**
+ * 生成完整的旅游故事视频文案
+ */
+function generateTravelStory(photos, config) {
+    const { videoTitle, style } = config;
+    
+    // 为每张照片生成文字
+    const photoCaptions = photos.map((photo, index) => ({
+        photoIndex: index,
+        caption: generatePhotoCaption(index, photos.length, style, videoTitle),
+        timestamp: index * 5 // 每张照片5秒
+    }));
+
+    // 生成开场白
+    const openingText = videoTitle || '我的旅行故事';
+    
+    // 生成结尾文字
+    const closingTexts = {
+        cinematic: '未完待续...',
+        vlog: '谢谢观看 ❤️',
+        memories: '珍惜每一刻 ✨',
+        dynamic: '下次见！🎉'
+    };
+    const closingText = closingTexts[style] || closingTexts.memories;
+
+    return {
+        opening: openingText,
+        captions: photoCaptions,
+        closing: closingText,
+        totalDuration: photos.length * 5
+    };
 }
 
 // API路由
